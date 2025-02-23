@@ -982,9 +982,12 @@ public:
       auto ty = llvm_type2alive(i.getType());
       auto ptr = get_operand(i.getOperand(0));
       auto align = llvm::cast<llvm::ConstantInt>(i.getOperand(1));
-      if (!ty || !ptr || !align)
+      auto mask = get_operand(i.getOperand(2));
+      auto passthru = get_operand(i.getOperand(3));
+      if (!ty || !ptr || !align || !mask || !passthru)
         return error(i);
-      ret = make_unique<Load>(*ty, value_name(i), *ptr, align->getValue().getZExtValue());
+      ret = make_unique<Load>(*ty, value_name(i), *ptr, align->getValue().getZExtValue(),
+                              mask, passthru);
       break;
     }
     case llvm::Intrinsic::masked_store:

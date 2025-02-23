@@ -977,6 +977,10 @@ public:
       ret = make_unique<UnaryReductionOp>(*ty, value_name(i), *val, op);
       break;
     }
+    case llvm::Intrinsic::masked_store:
+      break;
+    case llvm::Intrinsic::masked_load:
+      break;
     case llvm::Intrinsic::fshl:
     case llvm::Intrinsic::fshr:
     case llvm::Intrinsic::smul_fix:

@@ -977,10 +977,27 @@ public:
       ret = make_unique<UnaryReductionOp>(*ty, value_name(i), *val, op);
       break;
     }
-    case llvm::Intrinsic::masked_store:
-      break;
     case llvm::Intrinsic::masked_load:
+    {
+      auto ty = llvm_type2alive(i.getType());
+      auto ptr = get_operand(i.getOperand(0));
+      auto align = llvm::cast<llvm::ConstantInt>(i.getOperand(1));
+      if (!ty || !ptr || !align)
+        return error(i);
+      ret = make_unique<Load>(*ty, value_name(i), *ptr, align->getValue().getZExtValue());
       break;
+    }
+    case llvm::Intrinsic::masked_store:
+    {
+      auto val = get_operand(i.getOperand(0));
+      auto ptr = get_operand(i.getOperand(1));
+      auto align = llvm::cast<llvm::ConstantInt>(i.getOperand(2));
+      auto mask = get_operand(i.getOperand(3));
+      if (!val || !ptr || !align || !mask)
+        return error(i);
+      ret = make_unique<Store>(*ptr, *val, align->getValue().getZExtValue(), mask);
+      break;
+    }
     case llvm::Intrinsic::fshl:
     case llvm::Intrinsic::fshr:
     case llvm::Intrinsic::smul_fix:

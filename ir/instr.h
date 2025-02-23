@@ -908,9 +908,14 @@ public:
 class Load final : public MemInstr {
   Value *ptr;
   uint64_t align;
+  std::optional<Value *> mask;
+  std::optional<Value *> passthru;
 public:
-  Load(Type &type, std::string &&name, Value &ptr, uint64_t align)
-    : MemInstr(type, std::move(name)), ptr(&ptr), align(align) {}
+  Load(Type &type, std::string &&name, Value &ptr, uint64_t align,
+       std::optional<Value *> mask = std::nullopt,
+       std::optional<Value *> passthru = std::nullopt)
+    : MemInstr(type, std::move(name)), ptr(&ptr), align(align),
+      mask(std::move(mask)), passthru(std::move(passthru)) {}
 
   Value& getPtr() const { return *ptr; }
   uint64_t getAlign() const { return align; }
@@ -935,9 +940,10 @@ public:
 class Store final : public MemInstr {
   Value *ptr, *val;
   uint64_t align;
+  std::optional<Value *> mask;
 public:
-  Store(Value &ptr, Value &val, uint64_t align)
-    : MemInstr(Type::voidTy, "store"), ptr(&ptr), val(&val), align(align) {}
+  Store(Value &ptr, Value &val, uint64_t align, std::optional<Value *> mask = std::nullopt)
+    : MemInstr(Type::voidTy, "store"), ptr(&ptr), val(&val), align(align), mask(std::move(mask)) {}
 
   Value& getValue() const { return *val; }
   Value& getPtr() const { return *ptr; }

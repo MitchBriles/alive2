@@ -27,3 +27,5 @@ define i8 @tgt0(<8 x i1> %mask) {
   ret i8 16
 }
 
+
+; todo also do a masked load one

@@ -138,7 +138,6 @@ void tryReplacePtrtoInt(llvm::Function* fn) {
   }
 }
 
-
 llvm::ExitOnError ExitOnErr;
 
 void doit(llvm::Module *srcModule, llvm::Function *srcFn, Verifier &verifier,
@@ -180,7 +179,7 @@ void doit(llvm::Module *srcModule, llvm::Function *srcFn, Verifier &verifier,
 
   if (run_replace_ptrtoint) {
     tryReplacePtrtoInt(srcFn);
-    *out << "\nAfter replacing round trips\n";
+    *out << "\nAfter replacing round trips:\n\n";
     *out << lifter::funcToString(srcFn);
   }
 
@@ -401,8 +400,9 @@ version )EOF";
        << " failed-to-prove transformations\n"
           "  "
        << verifier.num_errors << " Alive2 errors\n"
-          "  "
-       << gepCount << " GEP insertions\n";
+          // "  "
+      //  << gepCount << " GEP insertions\n"
+       ;
 
   if (opt_smt_stats)
     smt::solver_print_stats(*out);

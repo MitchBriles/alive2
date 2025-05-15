@@ -177,12 +177,6 @@ void doit(llvm::Module *srcModule, llvm::Function *srcFn, Verifier &verifier,
       F.deleteBody();
   }
 
-  if (run_replace_ptrtoint) {
-    tryReplacePtrtoInt(srcFn);
-    *out << "\nAfter replacing round trips:\n\n";
-    *out << lifter::funcToString(srcFn);
-  }
-
   if (opt_internalize) {
     // nuke everything not reachable from the target function; this is
     // useful for removing clutter but should never be used when you
@@ -280,6 +274,12 @@ void doit(llvm::Module *srcModule, llvm::Function *srcFn, Verifier &verifier,
   *out << lifted;
   *out << "\n";
   out->flush();
+
+  if (run_replace_ptrtoint) {
+    tryReplacePtrtoInt(F2);
+    *out << "\nAfter replacing round trips:\n\n";
+    *out << lifter::funcToString(F2);
+  }
 
   if (!opt_skip_verification)
     verifier.compareFunctions(*F1, *F2);

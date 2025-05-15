@@ -1,3 +1,4 @@
+; TEST-ARGS: -run-replace-ptrtoint
 ; should optimize 2 geps ; currently gets scrambled
 define ptr @g(ptr noundef %p, i64 noundef %idx1, i64 noundef %idx2) {
     %i1 = ptrtoint ptr %p to i64

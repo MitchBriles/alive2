@@ -1,5 +1,7 @@
 .vs
 .vscode
+.cache
 build*/
+temp/
 *.pyc
 CMakeSettings.json

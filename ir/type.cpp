@@ -18,11 +18,7 @@ using namespace smt;
 using namespace util;
 using namespace std;
 
-static constexpr unsigned var_type_bits = 3;
-static constexpr unsigned var_bw_bits = 11;
-static constexpr unsigned var_elements_bits = 16;
 static_assert(IR::max_vector_elements == (1u << var_elements_bits) - 1);
-
 
 namespace IR {
 

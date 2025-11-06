@@ -16,6 +16,10 @@
 
 namespace smt { class Model; }
 
+static constexpr unsigned var_type_bits = 3;
+static constexpr unsigned var_bw_bits = 11;
+static constexpr unsigned var_vector_elements = 16;
+
 namespace IR {
 
 class AggregateType;

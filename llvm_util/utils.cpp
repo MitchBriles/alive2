@@ -118,8 +118,14 @@ Type* llvm_type2alive(const llvm::Type *ty) {
   switch (ty->getTypeID()) {
   case llvm::Type::VoidTyID:
     return &Type::voidTy;
-  case llvm::Type::IntegerTyID:
-    return &get_int_type(cast<llvm::IntegerType>(ty)->getBitWidth());
+  case llvm::Type::IntegerTyID: {
+    unsigned bits = cast<llvm::IntegerType>(ty)->getBitWidth();
+    if (bits >= ((1U << var_bw_bits) - 1)) {
+      *out << "ERROR: Integer bit-width " << bits << " is too large (max 2047)\n";
+      return nullptr;
+    }
+    return &get_int_type(bits);
+  }
   case llvm::Type::HalfTyID:
     return &half_type;
   case llvm::Type::FloatTyID:

@@ -1028,6 +1028,26 @@ expr expr::umul_fix_sat(const expr &a, const expr &b, const expr &c) {
               IntUMax(width));
 }
 
+expr expr::ABM(const expr &a, const expr &b, const expr &c) {
+  auto width = a.bits();
+  vector<expr> bits;
+  for (unsigned i = 0; i < width; i++) {
+    auto acc = mkUInt(0, 1);
+    for (unsigned j = 0; j < width; j++) {
+      uint64_t idx = i * width + j;
+      auto mbit = b.extract(idx, idx);
+      auto xbit = a.extract(j, j);
+      acc = acc | (mbit & xbit);
+    }
+    bits.push_back(acc);
+  }
+  auto res = bits[0];
+  for (unsigned i = 1; i < width; i++) {
+    res = res.concat(bits[i]);
+  }
+  return res ^ c;
+}
+
 expr expr::shl_no_soverflow(const expr &rhs) const {
   return (*this << rhs).ashr(rhs) == *this;
 }

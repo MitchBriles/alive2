@@ -205,6 +205,8 @@ public:
   static expr smul_fix_sat(const expr &a, const expr &b, const expr &c);
   static expr umul_fix_sat(const expr &a, const expr &b, const expr &c);
 
+  static expr ABM(const expr &a, const expr &b, const expr &c);
+
   expr shl_no_soverflow(const expr &rhs) const;
   expr shl_no_uoverflow(const expr &rhs) const;
   expr ashr_exact(const expr &rhs) const;

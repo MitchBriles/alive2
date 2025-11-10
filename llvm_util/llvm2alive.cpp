@@ -380,6 +380,10 @@ public:
         return make_unique<Assume>(*args.at(0), Assume::AndNonPoison);
       }
 
+      if (fn_decl->getName() == "ABM") {
+        return make_unique<TernaryOp>(*ty, value_name(i), *args.at(0), *args.at(1), *args.at(2), TernaryOp::ABM);
+      }
+
       if (fn_decl->isVarArg())
         vararg_idx = fn_decl->arg_size();
 

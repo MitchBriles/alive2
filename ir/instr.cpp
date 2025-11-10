@@ -1422,6 +1422,7 @@ void TernaryOp::print(ostream &os) const {
   case SMulFixSat: str = "smul_fix_sat "; break;
   case UMulFixSat: str = "umul_fix_sat "; break;
   case ObjectSize: str = "objectsize "; break;
+  case ABM: str = "ABM "; break;
   }
 
   os << getName() << " = " << str << *a << ", " << *b << ", " << *c;
@@ -1463,6 +1464,10 @@ StateValue TernaryOp::toSMT(State &s) const {
       s.addPre(expr::mkIf(b.value == 0 || (ptr.isNull() && c.value == 1),
                           v.value.uge(realval),
                           v.value.ule(realval)));
+      break;
+    }
+    case ABM: {
+      v.value = expr::ABM(a.value, b.value, c.value);
       break;
     }
     }
@@ -1513,6 +1518,14 @@ expr TernaryOp::getTypeConstraints(const Function &f) const {
       a->getType().enforcePtrType() &&
       b->getType().enforceIntType(1) &&
       c->getType().enforceIntType(1);
+    break;
+  case ABM:
+    // params: iN x, NxN bit matrix as an i(N^2), iN mask
+    instrconstr =
+      getType() == a->getType() &&
+      (getType().bits() * getType().bits()) == b->getType().bits() &&
+      getType() == c->getType() &&
+      getType().enforceIntOrVectorType();
     break;
   }
   return Value::getTypeConstraints() && instrconstr;

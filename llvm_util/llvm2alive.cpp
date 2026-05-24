@@ -211,6 +211,16 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
     return make_unique<Assume>(*make_intconst(0, 1), Assume::AndNonPoison);
   }
 
+  void addNoundefAssumes(const llvm::CallBase &i,
+                         const std::initializer_list<Value *> &args) {
+    unsigned idx = 0;
+    for (auto *arg : args) {
+      if (i.paramHasAttr(idx, llvm::Attribute::NoUndef))
+        BB->addInstr(make_unique<Assume>(*arg, Assume::WellDefined));
+      ++idx;
+    }
+  }
+
 public:
   llvm2alive_(llvm::Function &f, const llvm::TargetLibraryInfo &TLI, bool IsSrc,
               const vector<GlobalVariable*> &gvsInSrc)
@@ -694,11 +704,12 @@ public:
     return phi;
   }
 
-  RetTy visitBranchInst(llvm::BranchInst &i) {
-    auto &dst_true = getBB(i.getSuccessor(0));
-    if (i.isUnconditional())
-      return make_unique<Branch>(dst_true);
+  RetTy visitUncondBrInst(llvm::UncondBrInst &i) {
+    return make_unique<Branch>(getBB(i.getSuccessor(0)));
+  }
 
+  RetTy visitCondBrInst(llvm::CondBrInst &i) {
+    auto &dst_true = getBB(i.getSuccessor(0));
     auto &dst_false = getBB(i.getSuccessor(1));
     auto cond = get_operand(i.getCondition());
     if (!cond)
@@ -831,6 +842,7 @@ public:
     case llvm::Intrinsic::ucmp:
     case llvm::Intrinsic::scmp: {
       PARSE_BINOP();
+      addNoundefAssumes(i, {a, b});
       BinOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::sadd_with_overflow: op=BinOp::SAdd_Overflow; break;
@@ -867,6 +879,7 @@ public:
     case llvm::Intrinsic::expect_with_probability:
     case llvm::Intrinsic::is_constant: {
       PARSE_UNOP();
+      addNoundefAssumes(i, {val});
       UnaryOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::bitreverse:  op = UnaryOp::BitReverse; break;
@@ -892,6 +905,7 @@ public:
     case llvm::Intrinsic::vector_reduce_umax:
     case llvm::Intrinsic::vector_reduce_umin: {
       PARSE_UNOP();
+      addNoundefAssumes(i, {val});
       UnaryReductionOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::vector_reduce_add: op = UnaryReductionOp::Add; break;
@@ -908,6 +922,25 @@ public:
       ret = make_unique<UnaryReductionOp>(*ty, value_name(i), *val, op);
       break;
     }
+    case llvm::Intrinsic::vector_reduce_fmin:
+    case llvm::Intrinsic::vector_reduce_fmax:
+    case llvm::Intrinsic::vector_reduce_fminimum:
+    case llvm::Intrinsic::vector_reduce_fmaximum: {
+      PARSE_UNOP();
+      addNoundefAssumes(i, {val});
+      FpUnaryReductionOp::Op op;
+      switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::vector_reduce_fmin:     op = FpUnaryReductionOp::FMin; break;
+      case llvm::Intrinsic::vector_reduce_fmax:     op = FpUnaryReductionOp::FMax; break;
+      case llvm::Intrinsic::vector_reduce_fminimum: op = FpUnaryReductionOp::FMinimum; break;
+      case llvm::Intrinsic::vector_reduce_fmaximum: op = FpUnaryReductionOp::FMaximum; break;
+      default: UNREACHABLE();
+      }
+      ret = make_unique<FpUnaryReductionOp>(*ty, value_name(i), *val, op,
+                                            parse_fmath(i), parse_rounding(i),
+                                            parse_exceptions(i));
+      break;
+    }
     case llvm::Intrinsic::fshl:
     case llvm::Intrinsic::fshr:
     case llvm::Intrinsic::smul_fix:
@@ -917,6 +950,7 @@ public:
     case llvm::Intrinsic::objectsize:
     {
       PARSE_TRIOP();
+      addNoundefAssumes(i, {a, b, c});
       TernaryOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::fshl:         op = TernaryOp::FShl; break;
@@ -937,6 +971,7 @@ public:
     case llvm::Intrinsic::experimental_constrained_fmuladd:
     {
       PARSE_TRIOP();
+      addNoundefAssumes(i, {a, b, c});
       FpTernaryOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::fma:
@@ -967,6 +1002,7 @@ public:
     case llvm::Intrinsic::experimental_constrained_maximum:
     {
       PARSE_BINOP();
+      addNoundefAssumes(i, {a, b});
       FpBinOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::copysign:                         op = FpBinOp::CopySign; break;
@@ -1010,6 +1046,7 @@ public:
     case llvm::Intrinsic::experimental_constrained_trunc:
     {
       PARSE_UNOP();
+      addNoundefAssumes(i, {val});
       FpUnaryOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::canonicalize:                       op = FpUnaryOp::Canonicalize; break;
@@ -1039,6 +1076,7 @@ public:
     case llvm::Intrinsic::frexp:
     {
       PARSE_UNOP();
+      addNoundefAssumes(i, {val});
       FpUnaryOpVerticalZip::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::frexp: op = FpUnaryOpVerticalZip::FrExp; break;
@@ -1066,6 +1104,7 @@ public:
     case llvm::Intrinsic::fptosi_sat:
     {
       PARSE_UNOP();
+      addNoundefAssumes(i, {val});
       FpConversionOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::experimental_constrained_sitofp:  op = FpConversionOp::SIntToFP; break;
@@ -1096,6 +1135,7 @@ public:
     case llvm::Intrinsic::experimental_constrained_fcmps:
     {
       PARSE_BINOP();
+      addNoundefAssumes(i, {a, b});
       auto *fcmp = cast<llvm::ConstrainedFPCmpIntrinsic>(&i);
       auto cond = parse_fcmp_cond(fcmp->getPredicate());
       ret = make_unique<FCmp>(*ty, value_name(i), cond, *a, *b, FastMathFlags(),
@@ -1105,6 +1145,7 @@ public:
     case llvm::Intrinsic::is_fpclass:
     {
       PARSE_BINOP();
+      addNoundefAssumes(i, {a, b});
       TestOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::is_fpclass: op = TestOp::Is_FPClass; break;
@@ -1117,6 +1158,7 @@ public:
     case llvm::Intrinsic::lifetime_end:
     {
       PARSE_UNOP();
+      addNoundefAssumes(i, {val});
       if (isa<llvm::PoisonValue>(i.getOperand(1)))
         return NOP(i);
       if (i.getIntrinsicID() == llvm::Intrinsic::lifetime_end)
@@ -1148,6 +1190,7 @@ public:
     case llvm::Intrinsic::ptrmask:
     {
       PARSE_BINOP();
+      addNoundefAssumes(i, {a, b});
       ret = make_unique<PtrMask>(*ty, value_name(i), *a, *b);
       break;
     }
@@ -1169,14 +1212,17 @@ public:
     }
     case llvm::Intrinsic::vastart: {
       PARSE_UNOP();
+      addNoundefAssumes(i, {val});
       return make_unique<VaStart>(*val);
     }
     case llvm::Intrinsic::vaend: {
       PARSE_UNOP();
+      addNoundefAssumes(i, {val});
       return make_unique<VaEnd>(*val);
     }
     case llvm::Intrinsic::vacopy: {
       PARSE_BINOP();
+      addNoundefAssumes(i, {a, b});
       return make_unique<VaCopy>(*a, *b);
     }
 
@@ -1198,6 +1244,7 @@ public:
 #undef PROCESS
       {
         PARSE_BINOP();
+        addNoundefAssumes(i, {a, b});
         X86IntrinBinOp::Op op;
         switch (i.getIntrinsicID()) {
 #define PROCESS(NAME, A, B, C, D, E, F)                                        \
@@ -1217,6 +1264,7 @@ public:
 #undef PROCESS
       {
         PARSE_TRIOP();
+        addNoundefAssumes(i, {a, b, c});
         X86IntrinTerOp::Op op;
         switch (i.getIntrinsicID()) {
 #define PROCESS(NAME, A, B, C, D, E, F, G, H)                                  \
@@ -1236,6 +1284,7 @@ public:
 #undef PROCESS
       {
         PARSE_QUADOP();
+        addNoundefAssumes(i, {a, b, c, d});
         X86IntrinQuadOp::Op op;
         switch (i.getIntrinsicID()) {
 #define PROCESS(NAME)                                                          \
@@ -1370,7 +1419,7 @@ public:
       case LLVMContext::MD_callees: {
         auto *fn_call = dynamic_cast<FnCall*>(i);
         assert(fn_call);
-        auto &i1_type = get_int_type(1);
+        auto &i1_type = *get_int_type(1);
         Value *last_value = nullptr;
 
         for (auto &Op : Node->operands()) {
@@ -1620,9 +1669,13 @@ public:
         attrs.set(ParamAttrs::DeadOnUnwind);
         break;
 
-      case llvm::Attribute::DeadOnReturn:
+      case llvm::Attribute::DeadOnReturn: {
         attrs.set(ParamAttrs::DeadOnReturn);
+        const auto &info = llvmattr.getDeadOnReturnInfo();
+        if (!info.coversAllReachableMemory())
+          attrs.deadOnReturnBytes = info.getNumberOfDeadBytes();
         break;
+      }
 
       case llvm::Attribute::Initializes:
         for (auto &CR : llvmattr.getInitializes()) {
@@ -1686,24 +1739,26 @@ public:
     }
   }
 
-  static FPDenormalAttrs::Type parse_fp_denormal_str(string_view str) {
-    if (str == "dynamic")       return FPDenormalAttrs::Dynamic;
-    if (str == "ieee")          return FPDenormalAttrs::IEEE;
-    if (str == "preserve-sign") return FPDenormalAttrs::PreserveSign;
-    if (str == "positive-zero") return FPDenormalAttrs::PositiveZero;
-    UNREACHABLE();
+  static FPDenormalAttrs::Type parse_fp_denormal(llvm::DenormalMode::DenormalModeKind mode) {
+    switch (mode) {
+    case llvm::DenormalMode::IEEE:
+      return FPDenormalAttrs::IEEE;
+    case llvm::DenormalMode::PositiveZero:
+      return FPDenormalAttrs::PositiveZero;
+    case llvm::DenormalMode::PreserveSign:
+      return FPDenormalAttrs::PreserveSign;
+    case llvm::DenormalMode::Dynamic:
+      return FPDenormalAttrs::Dynamic;
+    default:
+      UNREACHABLE();
+    }
   }
 
-  static FPDenormalAttrs parse_fp_denormal(string_view str) {
-    FPDenormalAttrs attr;
-    auto comma = str.find(',');
-    if (comma == string_view::npos) {
-      attr.input = attr.output = parse_fp_denormal_str(str);
-    } else {
-      attr.output = parse_fp_denormal_str(string_view(str.data(), comma));
-      attr.input  = parse_fp_denormal_str(str.data() + comma + 1);
-    }
-    return attr;
+  static FPDenormalAttrs parse_fp_denormal(llvm::DenormalMode mode) {
+    return {
+      .input = parse_fp_denormal(mode.Input),
+      .output = parse_fp_denormal(mode.Output),
+    };
   }
 
   static void handleFnAttrs(const llvm::AttributeSet &aset, FnAttrs &attrs) {
@@ -1711,11 +1766,7 @@ public:
       if (llvmattr.isStringAttribute()) {
         auto str = llvmattr.getKindAsString();
         auto val = llvmattr.getValueAsString();
-        if (str == "denormal-fp-math") {
-          attrs.setFPDenormal(parse_fp_denormal(val));
-        } else if (str == "denormal-fp-math-f32") {
-          attrs.setFPDenormal(parse_fp_denormal(val), 32);
-        } else if (str == "alloc-family") {
+        if (str == "alloc-family") {
           attrs.allocfamily = val;
         }
       }
@@ -1735,6 +1786,13 @@ public:
         attrs.allocsize_0 = args.first;
         if (args.second)
           attrs.allocsize_1 = *args.second;
+        break;
+      }
+      case llvm::Attribute::DenormalFPEnv: {
+        auto fp_env = llvmattr.getDenormalFPEnv();
+        attrs.setFPDenormal(parse_fp_denormal(fp_env.DefaultMode));
+        if (fp_env.F32Mode != fp_env.DefaultMode)
+          attrs.setFPDenormal(parse_fp_denormal(fp_env.F32Mode), 32);
         break;
       }
       case llvm::Attribute::AllocKind: {

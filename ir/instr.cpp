@@ -1546,6 +1546,7 @@ void TernaryOp::print(ostream &os) const {
   case UMulFixSat: str = "umul_fix_sat "; break;
   case ObjectSize: str = "objectsize "; break;
   case ABM: str = "ABM "; break;
+  case ABM_XOR: str = "ABMX "; break;
   }
 
   os << getName() << " = " << str << *a << ", " << *b << ", " << *c;
@@ -1591,6 +1592,10 @@ StateValue TernaryOp::toSMT(State &s) const {
     }
     case ABM: {
       v.value = expr::ABM(a.value, b.value, c.value);
+      break;
+    }
+    case ABM_XOR: {
+      v.value = expr::ABM_XOR(a.value, b.value, c.value);
       break;
     }
     }
@@ -1643,6 +1648,7 @@ expr TernaryOp::getTypeConstraints(const Function &f) const {
       c->getType().enforceIntType(1);
     break;
   case ABM:
+  case ABM_XOR:
     // params: iN x, NxN bit matrix as an i(N^2), iN mask
     instrconstr =
       getType() == a->getType() &&

@@ -391,8 +391,11 @@ public:
         return make_unique<Assume>(*args.at(0), Assume::AndNonPoison);
       }
 
-      if (fn_decl->getName() == "ABM") {
-        return make_unique<TernaryOp>(*ty, value_name(i), *args.at(0), *args.at(1), *args.at(2), TernaryOp::ABM);
+      // ABM sums the bit-matrix product with OR, ABMX with XOR
+      if (fn_decl->getName() == "ABM" || fn_decl->getName() == "ABMX") {
+        auto op = fn_decl->getName() == "ABMX" ? TernaryOp::ABM_XOR
+                                               : TernaryOp::ABM;
+        return make_unique<TernaryOp>(*ty, value_name(i), *args.at(0), *args.at(1), *args.at(2), op);
       }
 
       if (fn_decl->isVarArg())

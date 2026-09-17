@@ -1028,16 +1028,22 @@ expr expr::umul_fix_sat(const expr &a, const expr &b, const expr &c) {
               IntUMax(width));
 }
 
-expr expr::ABM(const expr &a, const expr &b, const expr &c) {
+// Affine bit manipulation: M*x + b, where * is a bit-matrix product. The
+// intermediate sums use XOR when exclusive (a GF(2) product, as in
+// GF2P8AFFINEQB) and OR otherwise (a boolean matrix product). The choice is
+// made here, while the formula is built, so the solver never sees a branch.
+static expr ABM_impl(const expr &a, const expr &b, const expr &c,
+                     bool exclusive) {
   auto width = a.bits();
   vector<expr> bits;
   for (unsigned i = 0; i < width; i++) {
-    auto acc = mkUInt(0, 1);
+    auto acc = expr::mkUInt(0, 1);
     for (unsigned j = 0; j < width; j++) {
       uint64_t idx = i * width + j;
       auto mbit = b.extract(idx, idx);
       auto xbit = a.extract(j, j);
-      acc = acc | (mbit & xbit);
+      auto term = mbit & xbit;
+      acc = exclusive ? (acc ^ term) : (acc | term);
     }
     bits.push_back(acc);
   }
@@ -1046,6 +1052,14 @@ expr expr::ABM(const expr &a, const expr &b, const expr &c) {
     res = res.concat(bits[i]);
   }
   return res ^ c;
+}
+
+expr expr::ABM(const expr &a, const expr &b, const expr &c) {
+  return ABM_impl(a, b, c, false);
+}
+
+expr expr::ABM_XOR(const expr &a, const expr &b, const expr &c) {
+  return ABM_impl(a, b, c, true);
 }
 
 expr expr::shl_no_soverflow(const expr &rhs) const {

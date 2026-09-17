@@ -19,6 +19,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SourceMgr.h"
+#include <iostream>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -48,7 +49,9 @@ unsigned type_id_counter; // for unnamed types
 Function *current_fn;
 unordered_map<const llvm::Value*, Value*> value_cache;
 
-ostream *out;
+// Defaults to cerr so the error paths below stay safe for embedders that use
+// llvm2alive() without going through llvm_util::initializer.
+ostream *out = &cerr;
 
 const llvm::DataLayout *DL;
 
@@ -127,7 +130,8 @@ Type* llvm_type2alive(const llvm::Type *ty) {
   case llvm::Type::IntegerTyID: {
     unsigned bits = cast<llvm::IntegerType>(ty)->getBitWidth();
     if (bits >= ((1U << var_bw_bits) - 1)) {
-      *out << "ERROR: Integer bit-width " << bits << " is too large (max 2047)\n";
+      *out << "ERROR: Integer bit-width " << bits << " is too large (max "
+           << ((1U << var_bw_bits) - 2) << ")\n";
       return nullptr;
     }
     return get_int_type(bits);

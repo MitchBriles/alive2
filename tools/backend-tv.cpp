@@ -198,7 +198,6 @@ void doit(llvm::Module *srcModule, llvm::Function *srcFn, Verifier &verifier,
   }
 
   for (auto &global : srcModule->globals()) {
-    *out << global.getName().str();
     if (global.isThreadLocal()) {
       *out << "\nERROR: thread_local not supported\n\n";
       exit(-1);

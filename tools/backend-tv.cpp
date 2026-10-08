@@ -181,8 +181,14 @@ void tryReplacePtrtoInt(llvm::Function *fn) {
   }
 }
 
+// Unbuffered, so a driver can tell which stage an abort happened in.
+void phase(const char *p) {
+  fprintf(stderr, "BTV-PHASE: %s\n", p);
+}
+
 void doit(llvm::Module *srcModule, llvm::Function *srcFn, Verifier &verifier,
           llvm::TargetLibraryInfoWrapperPass &TLI) {
+  phase("precheck");
 
   // sigh... do this check earlier to stop an assertion in LLVM from
   // firing
@@ -211,6 +217,7 @@ void doit(llvm::Module *srcModule, llvm::Function *srcFn, Verifier &verifier,
       for (auto &i : bb)
         i.eraseMetadataIf(Pred);
 
+    phase("alive-parse");
     auto fn = llvm2alive(*srcFn, TLI.getTLI(*srcFn), /*isSrc=*/true);
     if (!fn) {
       *out << "Fatal error, exiting\n";
@@ -275,6 +282,7 @@ void doit(llvm::Module *srcModule, llvm::Function *srcFn, Verifier &verifier,
   std::unordered_map<unsigned, llvm::Instruction *> lineMap;
   // Handwritten assembly can use .loc to identify source calls too.
   lifter::addDebugInfo(srcFn, lineMap);
+  phase("codegen");
   if (opt_asm_input == "") {
     AsmBuffer = lifter::generateAsm(*srcModule, Targ, DefaultTT, DefaultCPU,
                                     DefaultFeatures);
@@ -304,6 +312,7 @@ void doit(llvm::Module *srcModule, llvm::Function *srcFn, Verifier &verifier,
   if (opt_asm_only)
     exit(0);
 
+  phase("lift");
   auto [F1, F2] =
       lifter::liftFunc(srcFn, std::move(AsmBuffer), lineMap, opt_optimize_tgt,
                        out, Targ, DefaultTT, DefaultCPU, DefaultFeatures);
@@ -321,8 +330,10 @@ void doit(llvm::Module *srcModule, llvm::Function *srcFn, Verifier &verifier,
     tryReplacePtrtoInt(F2);
   }
 
+  phase("verify");
   if (!opt_skip_verification)
     verifier.compareFunctions(*F1, *F2);
+  phase("done");
 
   *out << "done comparing functions\n";
   out->flush();

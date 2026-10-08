@@ -489,6 +489,22 @@ void State::check_enough_tmp_slots() {
     throw AliveException("Too many temporaries", false);
 }
 
+static expr non_poison_except_padding(const Type &ty, const StateValue &sv) {
+  const auto *aty = ty.getAsAggregateType();
+  if (!aty || ty.isVectorType())
+    return sv.non_poison.isBool() ? true : expr::mkInt(-1, sv.non_poison);
+
+  vector<StateValue> vals;
+  for (unsigned i = 0, e = aty->numElementsConst(); i != e; ++i) {
+    if (aty->isPadding(i))
+      continue;
+    auto elem = aty->extract(sv, i);
+    auto np = non_poison_except_padding(aty->getChild(i), elem);
+    vals.emplace_back(std::move(elem.value), std::move(np));
+  }
+  return aty->aggregateVals(vals).non_poison;
+}
+
 const StateValue& State::eval(const Value &val, bool quantify_nondet) {
   auto &[sval, _retdom, _ub, uvars] = values.at(&val);
 
@@ -509,10 +525,8 @@ const StateValue& State::eval(const Value &val, bool quantify_nondet) {
     if (is_non_undef) {
       sv_new.value = undef_itr->second;
     }
-    if (is_non_poison) {
-      const expr &np = sv_new.non_poison;
-      sv_new.non_poison = np.isBool() ? true : expr::mkInt(-1, np);
-    }
+    if (is_non_poison)
+      sv_new.non_poison = non_poison_except_padding(val.getType(), sv_new);
     return sv_new;
   };
 
@@ -641,7 +655,7 @@ State::getAndAddPoisonUB(const Value &val, bool undef_ub_too,
   check_enough_tmp_slots();
 
   return tmp_values[i_tmp_values++] = { std::move(v),
-           sv.non_poison.isBool() ? true : expr::mkInt(-1, sv.non_poison) };
+           non_poison_except_padding(val.getType(), sv) };
 }
 
 const StateValue& State::getVal(const Value &val, bool is_poison_ub) {

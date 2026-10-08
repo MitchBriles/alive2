@@ -979,6 +979,8 @@ void mc2llvm::checkInstSupport(Instruction &i, const DataLayout &DL,
     auto allocSize = ai->getAllocationSize(DL);
     if (allocSize)
       totalAllocas += allocSize->getFixedValue();
+    if (ai->getAlign() > Align(16))
+      totalAllocas += ai->getAlign().value();
   }
   if (auto *cb = dyn_cast<CallBase>(&i)) {
     if (isa<InlineAsm>(cb->getCalledOperand())) {

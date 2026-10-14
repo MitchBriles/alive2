@@ -1649,12 +1649,12 @@ expr TernaryOp::getTypeConstraints(const Function &f) const {
     break;
   case ABM:
   case ABM_XOR:
-    // params: iN x, NxN bit matrix as an i(N^2), iN mask
+    // params: iIn x, Out x In bit matrix as an i(Out*In), iOut mask
     instrconstr =
-      getType() == a->getType() &&
-      (getType().bits() * getType().bits()) == b->getType().bits() &&
+      getType().enforceIntType() &&
+      a->getType().enforceIntType() &&
       getType() == c->getType() &&
-      getType().enforceIntOrVectorType();
+      (getType().bits() * a->getType().bits()) == b->getType().bits();
     break;
   }
   return Value::getTypeConstraints() && instrconstr;

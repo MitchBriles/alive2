@@ -1032,14 +1032,19 @@ expr expr::umul_fix_sat(const expr &a, const expr &b, const expr &c) {
 // intermediate sums use XOR when exclusive (a GF(2) product, as in
 // GF2P8AFFINEQB) and OR otherwise (a boolean matrix product). The choice is
 // made here, while the formula is built, so the solver never sees a branch.
+//
+// M may be rectangular: x has In bits, the mask c (and the result) Out bits,
+// and M is Out x In, row i producing result bit Out-1-i from bit i*In+j of M.
+// A matrix over the concatenation of several values is how a binary operation
+// is expressed.
 static expr ABM_impl(const expr &a, const expr &b, const expr &c,
                      bool exclusive) {
-  auto width = a.bits();
+  unsigned in = a.bits(), out = c.bits();
   vector<expr> bits;
-  for (unsigned i = 0; i < width; i++) {
+  for (unsigned i = 0; i < out; i++) {
     auto acc = expr::mkUInt(0, 1);
-    for (unsigned j = 0; j < width; j++) {
-      uint64_t idx = i * width + j;
+    for (unsigned j = 0; j < in; j++) {
+      uint64_t idx = uint64_t(i) * in + j;
       auto mbit = b.extract(idx, idx);
       auto xbit = a.extract(j, j);
       auto term = mbit & xbit;
@@ -1048,7 +1053,7 @@ static expr ABM_impl(const expr &a, const expr &b, const expr &c,
     bits.push_back(acc);
   }
   auto res = bits[0];
-  for (unsigned i = 1; i < width; i++) {
+  for (unsigned i = 1; i < out; i++) {
     res = res.concat(bits[i]);
   }
   return res ^ c;

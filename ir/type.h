@@ -17,7 +17,7 @@
 namespace smt { class Model; }
 
 static constexpr unsigned var_type_bits = 3;
-static constexpr unsigned var_bw_bits = 13;
+static constexpr unsigned var_bw_bits = 14;
 static constexpr unsigned var_elements_bits = 16;
 
 namespace IR {
